@@ -99,5 +99,46 @@ namespace ExportReportToPDF.Models {
 
     }
 
+  public static void ExportVisual(Guid WorkspaceId, Guid ReportId, string PageName, string VisualName) {
+
+      PowerBIClient pbiClient = TokenManager.GetPowerBiClient(requiredScopes);
+
+      var exportRequest = new ExportReportRequest {        
+        Format = FileFormat.PDF,        
+        PowerBIReportConfiguration = new PowerBIReportExportConfiguration {
+          Pages = new List<ExportReportPage>() {
+            new ExportReportPage{ 
+              PageName=PageName, 
+              VisualName=VisualName
+            }
+          }
+        }      
+      };
+
+      Export export = pbiClient.Reports.ExportToFileInGroup(WorkspaceId, ReportId, exportRequest);
+
+      string exportId = export.Id;
+
+      do {
+        System.Threading.Thread.Sleep(5000);
+        export = pbiClient.Reports.GetExportToFileStatus(ReportId, exportId);
+        Console.WriteLine("Getting export status - " + export.PercentComplete.ToString() + "% complete");
+      } while (export.Status != ExportState.Succeeded && export.Status != ExportState.Failed);
+
+      if (export.Status == ExportState.Failed) {
+        Console.WriteLine("Export failed!");
+      }
+
+      if (export.Status == ExportState.Succeeded) {
+        string fileName = @"c:\DevCamp\Visual1.pdf";
+        Console.WriteLine("Saving exported file to " + fileName);
+        var exportStream = pbiClient.Reports.GetFileOfExportToFile(WorkspaceId, ReportId, exportId);
+        FileStream fileStream = File.Create(fileName);
+        exportStream.CopyTo(fileStream);
+        fileStream.Close();
+      }
+
+    }
+
   }
 }
